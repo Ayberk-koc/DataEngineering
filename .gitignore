@@ -1,0 +1,4 @@
+MyVenv/
+__pychache__/
+.env
+logs/
