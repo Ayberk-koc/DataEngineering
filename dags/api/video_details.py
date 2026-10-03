@@ -1,115 +1,19 @@
-import requests
 import json
-import os
-import time
-from utils import makeGeneralCall  #hier passiert das ganze callen!
+from datetime import date
+from api.utils import makeGeneralCall
 
-from dotenv import load_dotenv
-
-load_dotenv(dotenv_path=".env")
-
-APIKEY = os.getenv("APIKEY")
-
-CHANNEL = "MrBeast"
+from airflow.decorators import task
+from airflow.models import Variable
 
 
-### alter weg:
+API_KEY = Variable.get("API_KEY")
+CHANNEL_HANDLE = Variable.get("CHANNEL_HANDLE")
 
-# #immer mit try catch bei requetsts arbeiten!
-# def getPlaylistID():
-#     queryParams = {
-#         "key": APIKEY,   #hier gibt man key einfach als query-param mit. das ist eig unüblich
-#         "forHandle": "MrBeast",
-#         "part": "contentDetails"
-#     }
-#     headers = {    #eigentlich typisch, dass man key so mitgibt und nicht einfach in den query-params
-#         "X-API-Key": APIKEY
-#     }
-
-
-#     url = "https://www.googleapis.com/youtube/v3/channels"
-
-#     try:
-#         response = requests.get(url, params=queryParams)
-#         response.raise_for_status()
-
-#         data = response.json()
-
-#         # with open("data.json", "w") as file:
-#         #     json.dump(data, file, indent=4)
-
-#         playlistID = data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-
-#         print(playlistID)
-
-#         return playlistID
-
-#     except requests.exceptions.RequestException as e:
-#         raise e
-
-# def getVideoData(maxCount, playlistID, pageToken = None):
-#     url = "https://www.googleapis.com/youtube/v3/playlistItems"
-
-#     queryParams = {
-#         "maxResults": maxCount,
-#         "part": "contentDetails",
-#         "key": APIKEY,
-#         "playlistId": playlistID,
-#         "pageToken": pageToken
-#     }
-
-#     payload = {}
-#     headers = {}
-
-#     try:
-#         response = requests.request("GET", url, params=queryParams ,headers=headers, data=payload)
-#         response.raise_for_status()
-
-#         data = response.json()
-
-
-#         # with open("videos-data.json", "w") as file:
-#         #     json.dump(data, file, indent=4)
-
-#         # print(data)
-#         return data
-
-#     except requests.exceptions.RequestException as e:
-#         raise e
-
-# def getViodeoIDs(playListID):
-#     videoIDs = []
-
-#     try:
-#         data = getVideoData(50, playListID)
-
-#         while True: 
-#             for item in data.get("items", []):
-#                 details = item["contentDetails"]
-#                 videoID = details["videoId"]
-#                 videoIDs.append(videoID)
-
-#             nextPageToken = data.get("nextPageToken", None)
-
-#             if nextPageToken:
-#                 data = getVideoData(50, playListID, pageToken=nextPageToken)
-#             else:
-#                 break
-
-#         print(len(videoIDs))
-#         return videoIDs
-#     except requests.exceptions.RequestException as e:
-#         raise e
-
-
-
-
-
-
+@task
 def getPlayListIDGeneral(url):
     queryParams = {
-        "key": APIKEY,   #hier gibt man key einfach als query-param mit. das ist eig unüblich
-        "forHandle": "MrBeast",
+        "key": API_KEY,   #hier gibt man key einfach als query-param mit. das ist eig unüblich
+        "forHandle": CHANNEL_HANDLE,
         "part": "contentDetails"
     }
     data = makeGeneralCall(url, queryParams=queryParams)   #wie gesagt: Trick ist, so zu tun alb ob die funktion das Problem bereits löst!
@@ -117,12 +21,12 @@ def getPlayListIDGeneral(url):
 
     return playlistID
 
-
+@task
 def getRawVideoDataGeneral(url, playListID):
     queryParams = {
         "maxResults": 50,
         "part": "contentDetails",
-        "key": APIKEY,
+        "key": API_KEY,
         "playlistId": playListID,
     }
 
@@ -136,7 +40,6 @@ def getRawVideoDataGeneral(url, playListID):
 
     return videoIDs
 
-
 def batchUpVideoIDs(videoIDs, batchSize=50):
     i = 0
     batchedUpVideoIDs = []
@@ -149,7 +52,7 @@ def batchUpVideoIDs(videoIDs, batchSize=50):
 
     return batchedUpVideoIDs
 
-
+@task
 def getVideoStatistics(url, videoIDs):
     videosIDsStringList = batchUpVideoIDs(videoIDs)
 
@@ -158,7 +61,7 @@ def getVideoStatistics(url, videoIDs):
     for videoIDsString in videosIDsStringList:
         queryParams = {
             "part": ["statistics", "contentDetails", "snippet"],
-            "key": APIKEY,
+            "key": API_KEY,
             "maxResults": 50,
             "id": videoIDsString
         }
@@ -189,9 +92,9 @@ def getVideoStatistics(url, videoIDs):
 
     return videoDataList
 
-    
+@task
 def saveToJson(data):
-    with open("data.json", "w") as file:
+    with open(f"./data/YT_data_{date.today()}.json", "w") as file:
         json.dump(data, file, indent=4)
 
 
